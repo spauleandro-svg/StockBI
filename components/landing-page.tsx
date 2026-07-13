@@ -33,7 +33,8 @@ import {
   Check,
   CreditCard,
   Mail,
-  User
+  User,
+  Instagram
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -772,8 +773,22 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
               </button>
             </form>
 
-            <div className="pt-4 border-t border-neutral-100 text-center text-[11px] text-neutral-400 font-mono">
-              Suas dúvidas serão enviadas diretamente para: <span className="text-emerald-600 font-semibold">atendimento@estoquebi.com.br</span>
+            <div className="pt-4 border-t border-neutral-100 text-center text-[11px] text-neutral-400 font-mono space-y-1.5">
+              <div>
+                Suas dúvidas serão enviadas diretamente para: <span className="text-emerald-600 font-semibold">atendimento@estoquebi.com.br</span>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 text-xs text-neutral-500">
+                <span>Ou acompanhe novidades no</span>
+                <a
+                  href="https://www.instagram.com/estoquebi/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-emerald-600 hover:text-emerald-500 transition-colors"
+                >
+                  <Instagram className="w-3.5 h-3.5 animate-pulse" />
+                  <span>@estoquebi</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -878,7 +893,7 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
 
           <p>© 2026 SaaS STOCK.BI Inc. Todos os direitos reservados. Motor de Inteligência Artificial preditiva integrado.</p>
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center flex-wrap justify-center md:justify-end">
             <span className="hover:text-emerald-600 transition-all cursor-pointer">Segurança</span>
             <span>•</span>
             <span className="hover:text-emerald-600 transition-all cursor-pointer">Termos do Serviço</span>
@@ -886,6 +901,16 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
             <span className="hover:text-emerald-600 transition-all cursor-pointer">Privacidade LGPD</span>
             <span>•</span>
             <a href="#contato" className="hover:text-emerald-600 transition-all cursor-pointer">Contato</a>
+            <span>•</span>
+            <a
+              href="https://www.instagram.com/estoquebi/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-emerald-600 text-neutral-500 transition-all"
+            >
+              <Instagram className="w-3.5 h-3.5" />
+              <span>Instagram</span>
+            </a>
           </div>
         </div>
       </footer>
