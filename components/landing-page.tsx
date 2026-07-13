@@ -31,7 +31,9 @@ import {
   MessageSquare,
   Info,
   Check,
-  CreditCard
+  CreditCard,
+  Mail,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +42,50 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
+  // Contact Form States
+  const [contactName, setContactName] = useState<string>("");
+  const [contactEmail, setContactEmail] = useState<string>("");
+  const [contactMessage, setContactMessage] = useState<string>("");
+  const [contactSubmitting, setContactSubmitting] = useState<boolean>(false);
+  const [contactSuccess, setContactSuccess] = useState<string | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactSubmitting(true);
+    setContactSuccess(null);
+    setContactError(null);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: contactName,
+          email: contactEmail,
+          message: contactMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.erro || "Falha ao enviar a mensagem. Tente novamente.");
+      }
+
+      setContactSuccess(data.mensagem || "Sua dúvida foi enviada com sucesso!");
+      setContactName("");
+      setContactEmail("");
+      setContactMessage("");
+    } catch (err: any) {
+      setContactError(err.message || "Ocorreu um erro ao enviar sua mensagem.");
+    } finally {
+      setContactSubmitting(false);
+    }
+  };
+
   // ROI Calculator States
   const [faturamento, setFaturamento] = useState<number>(50000);
   const [taxaPerda, setTaxaPerda] = useState<number>(6); // 6% default loss/inefficiency
@@ -86,6 +132,7 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
             <a href="#beneficios" className="hover:text-emerald-600 transition-all">Benefícios</a>
             <a href="#roi" className="hover:text-emerald-600 transition-all">Calculadora de ROI</a>
             <a href="#funciona" className="hover:text-emerald-600 transition-all">Como Funciona</a>
+            <a href="#contato" className="hover:text-emerald-600 transition-all">Contato</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -624,6 +671,114 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Contact Section */}
+      <section className="py-20 bg-neutral-50 border-t border-b border-emerald-50 px-4 sm:px-6 lg:px-8" id="contato">
+        <div className="max-w-4xl mx-auto space-y-12 text-center">
+          <div className="space-y-4">
+            <span className="text-xs font-mono font-bold text-emerald-600 tracking-wider uppercase">Canal de Atendimento</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-neutral-900">
+              Tem Dúvidas? Fale Conosco
+            </h2>
+            <p className="text-sm text-neutral-500 max-w-2xl mx-auto">
+              Envie sua dúvida abaixo. Nossa equipe de suporte responderá diretamente em seu e-mail de contato.
+            </p>
+          </div>
+
+          <div className="max-w-xl mx-auto bg-white border border-emerald-100 rounded-3xl p-6 md:p-8 shadow-xl text-left space-y-6">
+            <form onSubmit={handleContactSubmit} className="space-y-5" id="form-contato">
+              <div className="space-y-1.5">
+                <label htmlFor="contact-name" className="text-xs font-bold text-neutral-700 block">
+                  Seu Nome
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    id="contact-name"
+                    required
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="Como gostaria de ser chamado?"
+                    className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 focus:border-emerald-500 focus:bg-white rounded-xl text-sm outline-none transition-all placeholder:text-neutral-400 text-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="contact-email" className="text-xs font-bold text-neutral-700 block">
+                  Seu E-mail
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    id="contact-email"
+                    required
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                    className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 focus:border-emerald-500 focus:bg-white rounded-xl text-sm outline-none transition-all placeholder:text-neutral-400 text-neutral-800"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="contact-message" className="text-xs font-bold text-neutral-700 block">
+                  Dúvidas / Mensagem
+                </label>
+                <textarea
+                  id="contact-message"
+                  required
+                  rows={4}
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Escreva aqui suas dúvidas, feedbacks ou solicitações de suporte..."
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 focus:border-emerald-500 focus:bg-white rounded-xl text-sm outline-none transition-all placeholder:text-neutral-400 text-neutral-800 resize-none"
+                />
+              </div>
+
+              {contactError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 flex items-start gap-2 animate-fade-in" id="alert-erro-contato">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{contactError}</span>
+                </div>
+              )}
+
+              {contactSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-800 flex items-start gap-2 animate-fade-in" id="alert-sucesso-contato">
+                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{contactSuccess}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={contactSubmitting}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-neutral-300 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                id="btn-enviar-contato"
+              >
+                {contactSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Enviando...</span>
+                  </>
+                ) : (
+                  <span>Enviar Minha Dúvida</span>
+                )}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-neutral-100 text-center text-[11px] text-neutral-400 font-mono">
+              Suas dúvidas serão enviadas diretamente para: <span className="text-emerald-600 font-semibold">atendimento@estoquebi.com.br</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Accordion FAQ Section */}
       <section className="py-20 bg-white px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto space-y-8">
@@ -729,6 +884,8 @@ export function LandingPage({ onNavigateToAuth }: LandingPageProps) {
             <span className="hover:text-emerald-600 transition-all cursor-pointer">Termos do Serviço</span>
             <span>•</span>
             <span className="hover:text-emerald-600 transition-all cursor-pointer">Privacidade LGPD</span>
+            <span>•</span>
+            <a href="#contato" className="hover:text-emerald-600 transition-all cursor-pointer">Contato</a>
           </div>
         </div>
       </footer>
