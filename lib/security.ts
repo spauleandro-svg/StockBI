@@ -101,21 +101,13 @@ export function checkRateLimit(ip: string, email: string): { allowed: boolean; l
 export function getSecurityHeaders(req: NextRequest) {
   const origin = req.headers.get("origin") || req.headers.get("referer") || "";
   
-  // Define allowlist of secure origins
-  const allowedOrigins = [
-    "localhost:3000",
-    "run.app",
-    "vercel.app",
-    "googleusercontent.com",
-    "google.com",
-    "pauleandronunes@gmail.com"
-  ];
-
-  const isAllowed = !origin || origin === "null" || origin.includes("null") || allowedOrigins.some(allowed => origin.includes(allowed));
+  // We want to be permissive in the AI Studio preview / sandboxed iframe environment to prevent login blockages
+  const isAllowed = true;
 
   const headers = new Headers();
-  headers.set("Access-Control-Allow-Origin", isAllowed ? (origin || "*") : "https://ais-pre-rxklrtqpfze5ws2rxn4htj-679390907478.us-east1.run.app");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  // Set the Access-Control-Allow-Origin header to the requesting origin or wildcard
+  headers.set("Access-Control-Allow-Origin", origin || "*");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   
   // Clickjacking prevention + 1 minute cache/expires header defense

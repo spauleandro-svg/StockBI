@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
     const host = process.env.SMTP_HOST || "smtp.zoho.com";
     const port = parseInt(process.env.SMTP_PORT || "465", 10);
     const secure = process.env.SMTP_SECURE === "false" ? false : true;
-    const user = process.env.SMTP_USER || "atendimento@estoquebi.com.br";
-    const pass = process.env.SMTP_PASS;
+    const user = process.env.SMTP_USER || "suporte_estoque_bi@zohomail.com";
+    const pass = process.env.SMTP_PASS || "Luc@31109";
 
     // Se as credenciais de SMTP não estiverem configuradas, avisamos no log e retornamos sucesso simulado
     if (!pass) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     // Conteúdo HTML profissional do email de contato
     const mailOptions = {
       from: `"${name}" <${user}>`, // Zoho geralmente exige que o remetente coincida com a conta autenticada
-      to: "atendimento@estoquebi.com.br",
+      to: "suporte_estoque_bi@zohomail.com",
       replyTo: email, // Permite responder diretamente ao email do usuário que enviou a dúvida
       subject: `[Contato Estoque & BI] Nova dúvida de ${name}`,
       text: `Nome: ${name}\nE-mail de contato: ${email}\n\nDúvida / Mensagem:\n${message}`,
