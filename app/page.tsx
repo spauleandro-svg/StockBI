@@ -49,6 +49,9 @@ import { cn } from "@/lib/utils";
 import { AuthScreens } from "@/components/auth-screens";
 import { LandingPage } from "@/components/landing-page";
 import { AdminDashboard } from "@/components/admin-dashboard";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+
 
 export default function Dashboard() {
   // --- USER AUTHENTICATION & MULTI-TENANCY STATES ---
@@ -61,9 +64,25 @@ export default function Dashboard() {
   const [dbSaveSuccess, setDbSaveSuccess] = useState<string | null>(null);
   const [adminViewTab, setAdminViewTab] = useState<"analises" | "gestao">("analises");
 
-  const loadUserRecord = (email: string) => {
-    const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
-    const found = allUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+  const loadUserRecord = async (email: string) => {
+    let found = null;
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, "users", email.toLowerCase());
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          found = docSnap.data();
+        }
+      } catch (error) {
+        console.error("Erro ao carregar usuário do Firebase:", error);
+      }
+    }
+
+    if (!found) {
+      const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
+      found = allUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    }
+
     if (found) {
       let changed = false;
       if (!found.createdAt) {
@@ -83,6 +102,14 @@ export default function Dashboard() {
         changed = true;
       }
       if (changed) {
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, "users", email.toLowerCase()), found);
+          } catch (e) {
+            console.error("Erro ao atualizar usuário no Firebase:", e);
+          }
+        }
+        const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
         const updatedUsers = allUsers.map((u: any) => u.email.toLowerCase() === email.toLowerCase() ? found : u);
         localStorage.setItem("stock_bi_registered_users", JSON.stringify(updatedUsers));
       }
@@ -90,18 +117,28 @@ export default function Dashboard() {
     }
   };
 
-  const updateFullUserRecord = (email: string, updates: Partial<any>) => {
+  const updateFullUserRecord = async (email: string, updates: Partial<any>) => {
+    let updatedUser = null;
     const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
     const updatedUsers = allUsers.map((u: any) => {
       if (u.email.toLowerCase() === email.toLowerCase()) {
-        return { ...u, ...updates };
+        updatedUser = { ...u, ...updates };
+        return updatedUser;
       }
       return u;
     });
     localStorage.setItem("stock_bi_registered_users", JSON.stringify(updatedUsers));
+
+    if (isFirebaseConfigured && db && updatedUser) {
+      try {
+        await setDoc(doc(db, "users", email.toLowerCase()), updatedUser);
+      } catch (error) {
+        console.error("Erro ao atualizar usuário no Firebase:", error);
+      }
+    }
     
     if (user && user.email.toLowerCase() === email.toLowerCase()) {
-      const activeRecord = updatedUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      const activeRecord = updatedUser || updatedUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
       setUserRecord(activeRecord);
     }
   };
@@ -113,50 +150,28 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // 1. Seed default accounts if empty
-    const storedUsers = localStorage.getItem("stock_bi_registered_users");
-    const npauleandroEmail = "npauleandro@gmail.com";
-    let allUsers = storedUsers ? JSON.parse(storedUsers) : [];
+    const initSessionAndSeeding = async () => {
+      // 1. Seed/load default accounts
+      const storedUsers = localStorage.getItem("stock_bi_registered_users");
+      const npauleandroEmail = "npauleandro@gmail.com";
+      let allUsers = storedUsers ? JSON.parse(storedUsers) : [];
 
-    const defaultUsers = [
-      {
-        name: "Paulo Leandro",
-        email: "pauleandronunes@gmail.com",
-        passwordHash: "123456",
-        role: "Administrador",
-        createdAt: new Date().toISOString(),
-        isPaid: true,
-        aiAnalysisCount: 0,
-        client: {
-          ...JSON.parse(JSON.stringify(SCENARIOS.pizzaria)),
-          nome_fantasia: "Pizzaria do Paulo",
-          id_cliente: "CLI-PAULO-99"
-        }
-      },
-      {
-        name: "Super Leandro",
-        email: npauleandroEmail,
-        passwordHash: "123456",
-        role: "Super usuário",
-        createdAt: new Date().toISOString(),
-        isPaid: true,
-        aiAnalysisCount: 0,
-        client: {
-          ...JSON.parse(JSON.stringify(SCENARIOS.pizzaria)),
-          nome_fantasia: "STOCK.BI Admin",
-          id_cliente: "CLI-ADMIN-99"
-        }
-      }
-    ];
-
-    if (!storedUsers || allUsers.length === 0) {
-      localStorage.setItem("stock_bi_registered_users", JSON.stringify(defaultUsers));
-      allUsers = defaultUsers;
-    } else {
-      // Ensure npauleandro@gmail.com is seeded even if users already exist
-      const hasNpauleandro = allUsers.some((u: any) => u.email.toLowerCase() === npauleandroEmail);
-      if (!hasNpauleandro) {
-        allUsers.push({
+      const defaultUsers = [
+        {
+          name: "Paulo Leandro",
+          email: "pauleandronunes@gmail.com",
+          passwordHash: "123456",
+          role: "Administrador",
+          createdAt: new Date().toISOString(),
+          isPaid: true,
+          aiAnalysisCount: 0,
+          client: {
+            ...JSON.parse(JSON.stringify(SCENARIOS.pizzaria)),
+            nome_fantasia: "Pizzaria do Paulo",
+            id_cliente: "CLI-PAULO-99"
+          }
+        },
+        {
           name: "Super Leandro",
           email: npauleandroEmail,
           passwordHash: "123456",
@@ -169,32 +184,101 @@ export default function Dashboard() {
             nome_fantasia: "STOCK.BI Admin",
             id_cliente: "CLI-ADMIN-99"
           }
-        });
-        localStorage.setItem("stock_bi_registered_users", JSON.stringify(allUsers));
-      }
-    }
+        }
+      ];
 
-    // 2. Load active session
-    const activeUser = localStorage.getItem("stock_bi_active_user");
-    if (activeUser) {
-      const parsedUser = JSON.parse(activeUser);
-      setUser({ name: parsedUser.name, email: parsedUser.email });
-      loadUserRecord(parsedUser.email);
-      
-      // Load user-specific client
-      const userRecord = allUsers.find((u: any) => u.email.toLowerCase() === parsedUser.email.toLowerCase());
-      if (userRecord && userRecord.client) {
-        setCurrentScenario(userRecord.client);
-        setSelectedKey("custom");
+      // Seeding in Firestore if configured
+      if (isFirebaseConfigured && db) {
+        try {
+          const querySnapshot = await getDocs(collection(db, "users"));
+          if (querySnapshot.empty) {
+            // Seed Firestore
+            for (const du of defaultUsers) {
+              await setDoc(doc(db, "users", du.email.toLowerCase()), du);
+            }
+            allUsers = defaultUsers;
+          } else {
+            // Pull users from Firestore and sync to localStorage cache
+            const usersFromDb: any[] = [];
+            querySnapshot.forEach((doc) => {
+              usersFromDb.push(doc.data());
+            });
+            allUsers = usersFromDb;
+            
+            // Ensure npauleandro@gmail.com is seeded in Firestore even if others exist
+            const hasNpauleandro = allUsers.some((u: any) => u.email.toLowerCase() === npauleandroEmail);
+            if (!hasNpauleandro) {
+              const superLeandro = defaultUsers[1];
+              await setDoc(doc(db, "users", npauleandroEmail), superLeandro);
+              allUsers.push(superLeandro);
+            }
+          }
+          localStorage.setItem("stock_bi_registered_users", JSON.stringify(allUsers));
+        } catch (error) {
+          console.error("Erro ao sincronizar/seedar Firebase no mount:", error);
+        }
+      } else {
+        // Local seeding logic
+        if (!storedUsers || allUsers.length === 0) {
+          localStorage.setItem("stock_bi_registered_users", JSON.stringify(defaultUsers));
+          allUsers = defaultUsers;
+        } else {
+          const hasNpauleandro = allUsers.some((u: any) => u.email.toLowerCase() === npauleandroEmail);
+          if (!hasNpauleandro) {
+            allUsers.push(defaultUsers[1]);
+            localStorage.setItem("stock_bi_registered_users", JSON.stringify(allUsers));
+          }
+        }
       }
-    }
-    setAuthLoading(false);
+
+      // 2. Load active session
+      const activeUser = localStorage.getItem("stock_bi_active_user");
+      if (activeUser) {
+        const parsedUser = JSON.parse(activeUser);
+        setUser({ name: parsedUser.name, email: parsedUser.email });
+        await loadUserRecord(parsedUser.email);
+        
+        // Load user-specific client (try to find in allUsers list or fetch from Firebase)
+        let userRecord = allUsers.find((u: any) => u.email.toLowerCase() === parsedUser.email.toLowerCase());
+        if (!userRecord && isFirebaseConfigured && db) {
+          try {
+            const docSnap = await getDoc(doc(db, "users", parsedUser.email.toLowerCase()));
+            if (docSnap.exists()) {
+              userRecord = docSnap.data();
+            }
+          } catch (e) {
+            console.error("Erro ao carregar record ativo:", e);
+          }
+        }
+        if (userRecord && userRecord.client) {
+          setCurrentScenario(userRecord.client);
+          setSelectedKey("custom");
+        }
+      }
+      setAuthLoading(false);
+    };
+
+    initSessionAndSeeding();
   }, []);
 
   const handleLogin = async (email: string, pass: string) => {
     try {
-      const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
-      const found = allUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      let found = null;
+      if (isFirebaseConfigured && db) {
+        try {
+          const docSnap = await getDoc(doc(db, "users", email.toLowerCase()));
+          if (docSnap.exists()) {
+            found = docSnap.data();
+          }
+        } catch (error) {
+          console.error("Erro no login com Firebase:", error);
+        }
+      }
+      
+      if (!found) {
+        const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
+        found = allUsers.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      }
       
       if (!found || found.passwordHash !== pass) {
         return { success: false, error: "E-mail ou senha inválido" };
@@ -205,7 +289,7 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: found.email,
           name: found.name,
           password: pass,
           id_cliente: found.client?.id_cliente || "CLI-UNKNOWN-00"
@@ -227,7 +311,7 @@ export default function Dashboard() {
       localStorage.setItem("stock_bi_token", sessionData.token);
       localStorage.setItem("stock_bi_active_user", JSON.stringify({ name: found.name, email: found.email }));
       setUser({ name: found.name, email: found.email });
-      loadUserRecord(found.email);
+      await loadUserRecord(found.email);
       
       if (found.client) {
         setCurrentScenario(found.client);
@@ -249,8 +333,22 @@ export default function Dashboard() {
     templateKey: string
   ) => {
     try {
-      const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
-      const exists = allUsers.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      let exists = false;
+      const emailClean = email.toLowerCase();
+
+      if (isFirebaseConfigured && db) {
+        try {
+          const docSnap = await getDoc(doc(db, "users", emailClean));
+          exists = docSnap.exists();
+        } catch (error) {
+          console.error("Erro ao verificar email no Firebase:", error);
+        }
+      }
+
+      if (!exists) {
+        const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
+        exists = allUsers.some((u: any) => u.email.toLowerCase() === emailClean);
+      }
 
       if (exists) {
         return { success: false, error: "Este e-mail já está cadastrado." };
@@ -263,12 +361,12 @@ export default function Dashboard() {
         id_cliente,
         nome_fantasia: businessName,
         segmento: segment,
-        contato_compras: email
+        contato_compras: emailClean
       };
 
       const newUser = {
         name,
-        email,
+        email: emailClean,
         passwordHash: pass,
         role: "Cliente",
         createdAt: new Date().toISOString(),
@@ -277,6 +375,15 @@ export default function Dashboard() {
         client: userClient
       };
 
+      if (isFirebaseConfigured && db) {
+        try {
+          await setDoc(doc(db, "users", emailClean), newUser);
+        } catch (error) {
+          console.error("Erro ao registrar usuário no Firebase:", error);
+        }
+      }
+
+      const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
       const updatedUsers = [...allUsers, newUser];
       localStorage.setItem("stock_bi_registered_users", JSON.stringify(updatedUsers));
 
@@ -285,7 +392,7 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: emailClean,
           name,
           password: pass,
           id_cliente
@@ -305,10 +412,10 @@ export default function Dashboard() {
       }
 
       localStorage.setItem("stock_bi_token", sessionData.token);
-      localStorage.setItem("stock_bi_active_user", JSON.stringify({ name, email }));
+      localStorage.setItem("stock_bi_active_user", JSON.stringify({ name, email: emailClean }));
       
-      setUser({ name, email });
-      loadUserRecord(email);
+      setUser({ name, email: emailClean });
+      await loadUserRecord(emailClean);
       setCurrentScenario(userClient);
       setSelectedKey("custom");
 
@@ -360,21 +467,32 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveActiveClient = () => {
+  const handleSaveActiveClient = async () => {
     if (!user) return;
     setDbSaving(true);
     setDbSaveSuccess(null);
     
     try {
+      let updatedUserObj = null;
       const allUsers = JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
       const updated = allUsers.map((u: any) => {
         if (u.email.toLowerCase() === user.email.toLowerCase()) {
-          return { ...u, client: currentScenario };
+          updatedUserObj = { ...u, client: currentScenario };
+          return updatedUserObj;
         }
         return u;
       });
       
       localStorage.setItem("stock_bi_registered_users", JSON.stringify(updated));
+
+      if (isFirebaseConfigured && db && updatedUserObj) {
+        try {
+          await setDoc(doc(db, "users", user.email.toLowerCase()), updatedUserObj);
+        } catch (fbErr) {
+          console.error("Erro ao salvar cliente ativo no Firebase:", fbErr);
+        }
+      }
+
       setDbSaveSuccess("Dados salvos com sucesso na nuvem corporativa!");
       setTimeout(() => setDbSaveSuccess(null), 3000);
     } catch (err) {
@@ -1281,10 +1399,16 @@ export default function Dashboard() {
               <Cpu className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                 SaaS STOCK.BI
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono font-medium">
                   BI Preditivo
+                </span>
+                <span className={cn(
+                  "text-[9px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wide border",
+                  isFirebaseConfigured ? "bg-emerald-950/40 text-emerald-400 border-emerald-900/50" : "bg-amber-950/40 text-amber-400 border-amber-900/50"
+                )}>
+                  {isFirebaseConfigured ? "Firebase Ativo" : "Offline Storage"}
                 </span>
               </h1>
               <p className="text-xs text-neutral-400">Analista Virtual de Compras, Suprimentos e Prevenção de Perdas</p>

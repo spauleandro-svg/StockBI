@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SCENARIOS } from "@/lib/scenarios";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
+
 
 interface AdminDashboardProps {
   currentUserEmail: string;
@@ -31,35 +34,7 @@ export function AdminDashboard({
   currentUserRole,
   onUserDatabaseChange
 }: AdminDashboardProps) {
-  const [users, setUsers] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("stock_bi_registered_users") || "[]");
-    }
-    return [];
-  });
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("Todos");
-  const [subFilter, setSubFilter] = useState<string>("Todos");
 
-  // New user form states
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState("Cliente");
-  const [newIsPaid, setNewIsPaid] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
-
-  // Edit states for user roles
-  const [editingEmail, setEditingEmail] = useState<string | null>(null);
-  const [tempRole, setTempRole] = useState<string>("");
-
-  const saveUsersList = (updatedList: any[]) => {
-    localStorage.setItem("stock_bi_registered_users", JSON.stringify(updatedList));
-    setUsers(updatedList);
-    onUserDatabaseChange();
-  };
 
   // KPI calculations
   const totalUsers = users.length;
