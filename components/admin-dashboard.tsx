@@ -34,7 +34,58 @@ export function AdminDashboard({
   currentUserRole,
   onUserDatabaseChange
 }: AdminDashboardProps) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("Todos");
+  const [subFilter, setSubFilter] = useState<string>("Todos");
 
+  // New user form states
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("Cliente");
+  const [newIsPaid, setNewIsPaid] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  // Edit states for user roles
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [tempRole, setTempRole] = useState<string>("");
+
+  // Load users from Firestore or LocalStorage on mount
+  useEffect(() => {
+    async function loadUsers() {
+      if (isFirebaseConfigured && db) {
+        try {
+          const querySnapshot = await getDocs(collection(db, "users"));
+          const fbUsers: any[] = [];
+          querySnapshot.forEach((doc) => {
+            fbUsers.push(doc.data());
+          });
+          setUsers(fbUsers);
+          return;
+        } catch (error) {
+          console.error("Erro ao carregar usuários do Firebase:", error);
+        }
+      }
+      
+      // Fallback to localStorage
+      if (typeof window !== "undefined") {
+        const local = localStorage.getItem("stock_bi_registered_users");
+        if (local) {
+          setUsers(JSON.parse(local));
+        }
+      }
+    }
+    loadUsers();
+  }, []);
+
+  const saveUsersList = (updatedList: any[]) => {
+    localStorage.setItem("stock_bi_registered_users", JSON.stringify(updatedList));
+    setUsers(updatedList);
+    onUserDatabaseChange();
+  };
 
   // KPI calculations
   const totalUsers = users.length;
@@ -45,7 +96,7 @@ export function AdminDashboard({
   const clientsCount = users.filter((u) => u.role === "Cliente" || !u.role).length;
 
   // Add new user handler
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
@@ -82,6 +133,14 @@ export function AdminDashboard({
       client: defaultClient
     };
 
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "users", emailClean), newUser);
+      } catch (error) {
+        console.error("Erro ao registrar usuário no Firebase:", error);
+      }
+    }
+
     const updated = [...users, newUser];
     saveUsersList(updated);
 
@@ -99,7 +158,7 @@ export function AdminDashboard({
   };
 
   // Role modification helper
-  const handleUpdateRole = (email: string, targetRole: string) => {
+  const handleUpdateRole = async (email: string, targetRole: string) => {
     // Validate hierarchy constraints
     // 1. Only Super usuário can promote/demote or modify a Super usuário role
     const targetUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
@@ -114,9 +173,18 @@ export function AdminDashboard({
       return;
     }
 
+    const updatedUser = { ...targetUser, role: targetRole };
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "users", email.toLowerCase()), updatedUser);
+      } catch (error) {
+        console.error("Erro ao atualizar perfil no Firebase:", error);
+      }
+    }
+
     const updated = users.map((u) => {
       if (u.email.toLowerCase() === email.toLowerCase()) {
-        return { ...u, role: targetRole };
+        return updatedUser;
       }
       return u;
     });
@@ -126,10 +194,22 @@ export function AdminDashboard({
   };
 
   // Toggle Subscription helper
-  const handleToggleSubscription = (email: string) => {
+  const handleToggleSubscription = async (email: string) => {
+    const targetUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (!targetUser) return;
+
+    const updatedUser = { ...targetUser, isPaid: !targetUser.isPaid };
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "users", email.toLowerCase()), updatedUser);
+      } catch (error) {
+        console.error("Erro ao alternar plano no Firebase:", error);
+      }
+    }
+
     const updated = users.map((u) => {
       if (u.email.toLowerCase() === email.toLowerCase()) {
-        return { ...u, isPaid: !u.isPaid };
+        return updatedUser;
       }
       return u;
     });
@@ -137,10 +217,22 @@ export function AdminDashboard({
   };
 
   // Reset AI Counter
-  const handleResetAICounter = (email: string) => {
+  const handleResetAICounter = async (email: string) => {
+    const targetUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (!targetUser) return;
+
+    const updatedUser = { ...targetUser, aiAnalysisCount: 0 };
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "users", email.toLowerCase()), updatedUser);
+      } catch (error) {
+        console.error("Erro ao resetar contador no Firebase:", error);
+      }
+    }
+
     const updated = users.map((u) => {
       if (u.email.toLowerCase() === email.toLowerCase()) {
-        return { ...u, aiAnalysisCount: 0 };
+        return updatedUser;
       }
       return u;
     });
@@ -148,7 +240,7 @@ export function AdminDashboard({
   };
 
   // Delete User
-  const handleDeleteUser = (email: string) => {
+  const handleDeleteUser = async (email: string) => {
     if (email.toLowerCase() === currentUserEmail.toLowerCase()) {
       alert("Erro: Você não pode excluir seu próprio usuário ativo.");
       return;
@@ -163,6 +255,13 @@ export function AdminDashboard({
     }
 
     if (confirm(`Tem certeza que deseja excluir permanentemente o usuário ${targetUser.name} (${email})?`)) {
+      if (isFirebaseConfigured && db) {
+        try {
+          await deleteDoc(doc(db, "users", email.toLowerCase()));
+        } catch (error) {
+          console.error("Erro ao excluir usuário no Firebase:", error);
+        }
+      }
       const updated = users.filter((u) => u.email.toLowerCase() !== email.toLowerCase());
       saveUsersList(updated);
     }
