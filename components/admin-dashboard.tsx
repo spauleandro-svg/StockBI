@@ -38,8 +38,8 @@ export function AdminDashboard({
 
   // KPI calculations
   const totalUsers = users.length;
-  const activeSubs = users.filter((u) => u.isPaid).length;
-  const totalAIQueries = users.reduce((acc, u) => acc + (u.aiAnalysisCount || 0), 0);
+ // const activeSubs = users.filter((u) => u.isPaid).length;
+ // const totalAIQueries = users.reduce((acc, u) => acc + (u.aiAnalysisCount || 0), 0);
   //const superUsersCount = users.filter((u) => u.role === "Super usuário").length;
   //const adminsCount = users.filter((u) => u.role === "Administrador").length;
   const clientsCount = users.filter((u) => u.role === "Cliente" || !u.role).length;
