@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SCENARIOS } from "@/lib/scenarios";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 
 interface AdminDashboardProps {
@@ -53,23 +53,25 @@ export function AdminDashboard({
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [tempRole, setTempRole] = useState<string>("");
 
-  // Load users from Firestore or LocalStorage on mount
+  // Load users from Firestore (real-time listener) or LocalStorage on mount
   useEffect(() => {
-    async function loadUsers() {
-      if (isFirebaseConfigured && db) {
-        try {
-          const querySnapshot = await getDocs(collection(db, "users"));
+    let unsubscribe: () => void = () => {};
+
+    if (isFirebaseConfigured && db) {
+      try {
+        unsubscribe = onSnapshot(collection(db, "users"), (querySnapshot) => {
           const fbUsers: any[] = [];
           querySnapshot.forEach((doc) => {
             fbUsers.push(doc.data());
           });
           setUsers(fbUsers);
-          return;
-        } catch (error) {
-          console.error("Erro ao carregar usuários do Firebase:", error);
-        }
+        }, (error) => {
+          console.error("Erro no listener em tempo real do Firebase:", error);
+        });
+      } catch (error) {
+        console.error("Erro ao iniciar o listener do Firebase:", error);
       }
-      
+    } else {
       // Fallback to localStorage
       if (typeof window !== "undefined") {
         const local = localStorage.getItem("stock_bi_registered_users");
@@ -78,7 +80,8 @@ export function AdminDashboard({
         }
       }
     }
-    loadUsers();
+
+    return () => unsubscribe();
   }, []);
 
   const saveUsersList = (updatedList: any[]) => {
